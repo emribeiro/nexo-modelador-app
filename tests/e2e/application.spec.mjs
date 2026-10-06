@@ -1,0 +1,90 @@
+import { test,expect } from '@playwright/test';
+
+test('jornada completa: cadastrar, importar, executar fluxo e validar teste',async ({ page }) => {
+  const errors = []; page.on('pageerror',error => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.getByRole('heading',{ name:'Vamos começar.' })).toBeVisible();
+  await page.getByLabel('Seu nome').fill('Arquiteto de testes');
+  await page.getByLabel('E-mail',{ exact:true }).fill('e2e@example.test');
+  await page.getByLabel('Senha',{ exact:true }).fill('senha-e2e-bem-segura');
+  await page.getByRole('button',{ name:'Criar meu workspace' }).click();
+  await expect(page.getByRole('heading',{ name:'Visão geral',exact:true })).toBeVisible();
+  await expect(page.getByRole('button',{ name:/Cadastro de clientes/ })).toBeVisible();
+  await page.screenshot({ path:'test-results/dashboard.png',fullPage:true });
+
+  await page.getByRole('link',{ name:'Fluxos de integração',exact:true }).click();
+  await page.getByRole('button',{ name:'Abrir editor' }).first().click();
+  await expect(page.getByText('Editor visual',{ exact:true })).toBeVisible();
+  await expect(page.locator('.react-flow__node')).toHaveCount(3);
+  await page.screenshot({ path:'test-results/flow-editor.png',fullPage:true });
+  await page.getByRole('button',{ name:'Executar',exact:true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button',{ name:'Executar',exact:true }).click();
+  await expect(dialog.getByText('Execução concluída com sucesso')).toBeVisible();
+  await expect(dialog.getByText('Consultar saldo',{ exact:true })).toBeVisible();
+  await page.screenshot({ path:'test-results/flow-result.png',fullPage:true });
+  await dialog.getByRole('button',{ name:'Fechar',exact:true }).last().click();
+
+  await page.getByRole('link',{ name:'Testes funcionais',exact:true }).click();
+  const positive = page.locator('.test-row').filter({ hasText:'Saldo disponível na jornada' });
+  await positive.getByRole('button',{ name:'Executar' }).click();
+  await expect(page.getByRole('dialog').getByText('Execução concluída com sucesso')).toBeVisible();
+  await expect(page.locator('.assertion')).toHaveCount(3);
+  await page.getByRole('dialog').getByRole('button',{ name:'Fechar',exact:true }).click();
+  const negative = page.locator('.test-row').filter({ hasText:'Cliente inexistente' });
+  await negative.getByRole('button',{ name:'Executar' }).click();
+  await expect(page.getByRole('dialog').getByText('Execução concluída com sucesso')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button',{ name:'Fechar',exact:true }).click();
+
+  await page.getByRole('link',{ name:'Importar serviços',exact:true }).click();
+  await page.getByRole('button',{ name:'Carregar contrato de demonstração' }).click();
+  await page.getByRole('button',{ name:'Analisar e revisar' }).click();
+  await expect(page.getByRole('heading',{ name:'Operações identificadas' })).toBeVisible();
+  await page.getByLabel('Perfil de autenticação',{ exact:true }).selectOption('auth-demo');
+  await page.getByRole('button',{ name:'Importar serviço',exact:true }).click();
+  await expect(page.getByRole('heading',{ name:'Clientes importados · Demo',exact:true })).toBeVisible();
+  await page.getByRole('button',{ name:'Executar',exact:true }).click();
+  await page.getByLabel('Dados da requisição').fill(JSON.stringify({ path:{ id:'cli-001' },query:{},headers:{} },null,2));
+  await page.getByRole('dialog').getByRole('button',{ name:'Executar',exact:true }).click();
+  await expect(page.getByRole('dialog').getByText('Execução concluída com sucesso')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button',{ name:'Fechar',exact:true }).last().click();
+
+  await page.getByRole('link',{ name:'Catálogo de serviços',exact:false }).click();
+  await page.getByRole('button',{ name:'Novo serviço',exact:true }).click();
+  await page.getByLabel('Nome do serviço').fill('API criada no navegador');
+  await page.getByLabel('Descrição',{ exact:true }).fill('Contrato de teste da interface.');
+  await page.getByRole('button',{ name:'Criar serviço' }).click();
+  await expect(page.getByRole('heading',{ name:'API criada no navegador' })).toBeVisible();
+  await page.getByRole('button',{ name:'Nova operação' }).click();
+  await page.getByLabel('Nome da operação').fill('Consultar status');
+  await page.getByLabel('Caminho',{ exact:true }).fill('/status');
+  await page.getByRole('button',{ name:'Salvar operação' }).click();
+  await expect(page.locator('.operation-row')).toContainText('Consultar status');
+  await page.reload();
+  await expect(page.locator('.operation-row')).toContainText('Consultar status');
+
+  await page.getByRole('link',{ name:'Fluxos de integração',exact:true }).click();
+  await page.getByRole('button',{ name:'Novo fluxo',exact:true }).click();
+  await page.locator('.library-operation').filter({ hasText:'Listar clientes' }).click();
+  await page.getByRole('button',{ name:'Aplicar à etapa' }).click();
+  await page.getByRole('button',{ name:'Definições' }).click();
+  await page.getByLabel('Nome do fluxo').fill('Fluxo criado no navegador');
+  await page.getByRole('button',{ name:'Aplicar definições' }).click();
+  await page.getByRole('button',{ name:'Salvar fluxo' }).click();
+  await expect(page.getByRole('button',{ name:'Executar',exact:true })).toBeEnabled();
+  await page.getByRole('button',{ name:'Executar',exact:true }).click();
+  await page.getByRole('dialog').getByRole('button',{ name:'Executar',exact:true }).click();
+  await expect(page.getByRole('dialog').getByText('Execução concluída com sucesso')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button',{ name:'Fechar',exact:true }).last().click();
+
+  await page.goto('/#/overview');
+  await page.setViewportSize({ width:390,height:844 });
+  await expect(page.getByRole('button',{ name:'Abrir menu' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect.poll(() => page.locator('.sidebar').evaluate(el => el.getBoundingClientRect().right <= 1)).toBe(true);
+  await page.screenshot({ path:'test-results/mobile.png',fullPage:true,animations:'disabled' });
+  await page.getByRole('button',{ name:'Abrir menu' }).click();
+  await page.getByRole('link',{ name:'Histórico e auditoria' }).click();
+  await expect(page.getByRole('heading',{ name:'Histórico e auditoria',exact:true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
